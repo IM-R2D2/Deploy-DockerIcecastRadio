@@ -1,0 +1,20 @@
+# Локальная конфигурация (секреты, хостовые настройки)
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Редакторы и IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Временные и служебные
+*.log
+*.tmp
+.cache/

@@ -1,0 +1,35 @@
+services:
+  rvol:
+    image: imr2d2/icecast-kh:latest
+    container_name: ${PROJECT_NAME}-radio
+    restart: unless-stopped
+    ports:
+      - "${PORT_ICECAST_EXTERNAL}:${PORT_ICECAST}"
+    networks:
+      ${PROJECT_NAME}_net:
+        ipv4_address: ${IP_ADDRESS}
+    volumes:
+      - /usr/local/bin/docker/${PROJECT_NAME}/conf/${PROJECT_NAME}.xml:/etc/icecast-kh/icecast.xml:ro
+      - /var/log/docker/${PROJECT_NAME}/icecast:/var/log/icecast-kh
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:${PORT_ICECAST}/status.xsl || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  ${PROJECT_NAME}_net:
+    name: ${PROJECT_NAME}-net
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-${PROJECT_NAME}
+    ipam:
+      config:
+        - subnet: ${SUBNET}
+          gateway: ${IP_ADDRESS_GATEWAY}
