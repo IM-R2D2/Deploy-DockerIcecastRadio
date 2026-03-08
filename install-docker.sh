@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
-# Установка Docker (Ubuntu) из официального репозитория
-# Запуск: sudo ./install-docker.sh
+# Install Docker (Ubuntu) from the official repository
+# Run: sudo ./install-docker.sh
 
 set -e
 
 if [[ $EUID -ne 0 ]]; then
-  echo "Запустите скрипт с правами root: sudo $0"
+  echo "Run this script as root: sudo $0"
   exit 1
 fi
 
-echo "=== Установка Docker ==="
+echo "=== Installing Docker ==="
 
-# Проверка: уже установлен?
+# Check: already installed?
 if command -v docker &>/dev/null && docker --version &>/dev/null; then
-  echo "Docker уже установлен: $(docker --version)"
+  echo "Docker is already installed: $(docker --version)"
   docker compose version 2>/dev/null || true
   exit 0
 fi
 
-echo "Обновление пакетов и установка зависимостей..."
+echo "Updating packages and installing dependencies..."
 apt update
 apt install -y ca-certificates curl gnupg
 
-echo "Добавление ключа и репозитория Docker..."
+echo "Adding Docker key and repository..."
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
   | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -34,22 +34,22 @@ echo \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
   | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-echo "Установка пакетов Docker..."
+echo "Installing Docker packages..."
 apt update
 apt install -y docker-ce docker-ce-cli containerd.io \
   docker-buildx-plugin docker-compose-plugin
 
-echo "Добавление пользователя ${SUDO_USER:-$USER} в группу docker..."
+echo "Adding user ${SUDO_USER:-$USER} to group docker..."
 usermod -aG docker "${SUDO_USER:-$USER}"
 
-echo "Запуск и включение службы Docker..."
+echo "Starting and enabling Docker service..."
 systemctl start docker
 systemctl enable docker
 
 echo ""
-echo "Docker установлен: $(docker --version)"
+echo "Docker installed: $(docker --version)"
 docker compose version 2>/dev/null || true
 echo ""
-echo "Чтобы использовать docker без sudo, выполните один из вариантов:"
-echo "  - выйти из сессии и войти снова;"
-echo "  - или выполнить: newgrp docker"
+echo "To use docker without sudo, either:"
+echo "  - log out and log back in, or"
+echo "  - run: newgrp docker"
