@@ -1,0 +1,124 @@
+<icecast>
+  <location>${PROJECT_NAME_ICECAST}</location>
+  <admin>${PROJECT_NAME_ICECAST_ADMIN}</admin>
+
+  <limits>
+    <clients>${LIMITS_CLIENTS}</clients>
+    <sources>${LIMITS_SOURCES}</sources>
+    <queue-size>1048576</queue-size>
+    <client-timeout>60</client-timeout>
+    <header-timeout>30</header-timeout>
+    <source-timeout>10</source-timeout>
+    <burst-size>65535</burst-size>
+    <max-bandwidth>${LIMITS_MAX_BANDWIDTH}</max-bandwidth>
+  </limits>
+
+  <authentication>
+     <!-- Sources log in with username 'source' -->
+     <source-password>${SOURCE_PASSWORD}</source-password>
+     <!-- Relays log in with username 'relay' -->
+     <relay-password>${RELAY_PASSWORD}</relay-password>
+     <!-- Admin logs in with the username given below -->
+     <admin-user>${ADMIN_LOGIN}</admin-user>
+     <admin-password>${ADMIN_PASSWORD}</admin-password>
+  </authentication>
+
+  <hostname>localhost</hostname>
+    <listen-socket>
+      <port>${PORT_ICECAST}</port>
+      <!-- <bind-address>127.0.0.1</bind-address> -->
+      <!-- <shoutcast-mount>/stream</shoutcast-mount> -->
+    </listen-socket>
+
+<!-- ################################################# -->
+<!-- MAIN STREAM -->
+<mount>
+    <mount-name>/${NAME_MAIN_MOUNT}</mount-name>
+    <max-listeners>${MAX_LISTENERS}</max-listeners>
+    <stream-name>${STREAM_NAME}</stream-name>
+    <stream-description>${STREAM_DESCRIPTION}</stream-description>
+    <genre>${STREAM_GENRE}</genre>
+    <stream-url>${STREAM_URL}</stream-url>
+    <charset>UTF-8</charset>
+    <fallback-mount>/${NAME_FALLBACK_MOUNT}</fallback-mount>
+    <fallback-override>1</fallback-override>
+    <fallback-when-full>1</fallback-when-full>
+    <hidden>0</hidden>
+    <public>0</public>
+</mount>
+
+<!-- ################################################# -->
+<!-- FALLBACK STREAM -->
+<mount>
+    <mount-name>/${NAME_FALLBACK_MOUNT}</mount-name>
+    <max-listeners>${MAX_LISTENERS}</max-listeners>
+    <stream-name>${STREAM_NAME}</stream-name>
+    <stream-description>${STREAM_DESCRIPTION}</stream-description>
+    <genre>${STREAM_GENRE}</genre>
+    <stream-url>${STREAM_URL}</stream-url>
+    <charset>UTF-8</charset>
+    <fallback-mount>/${NAME_FALLBACK_MOUNT}</fallback-mount>
+    <fallback-override>1</fallback-override>
+    <fallback-when-full>1</fallback-when-full>
+    <hidden>0</hidden>
+    <public>0</public>
+</mount>
+
+
+<!-- Relay Stream -->
+<!-- <relay>
+    <server>some.server.com</server>
+    <port>8000</port>
+    <mount>somemount-relay</mount>
+    <local-mount>/somemount-relay</local-mount>
+    <username>relay</username>
+    <password>password</password>
+    <on-demand>0</on-demand>
+    <retry-delay>30</retry-delay>
+    <relay-shoutcast-metadata>1</relay-shoutcast-metadata>
+</relay> -->
+
+<!-- <mount>
+    <mount-name>/somemount-relay</mount-name>
+    <max-listeners>${MAX_LISTENERS}</max-listeners>
+    <stream-name>${STREAM_NAME}</stream-name>
+    <stream-description>${STREAM_DESCRIPTION}</stream-description>
+    <genre>${STREAM_GENRE}</genre>
+    <stream-url>${STREAM_URL}</stream-url>
+    <charset>UTF-8</charset>
+    <hidden>0</hidden>
+    <public>0</public>
+</mount> -->
+
+
+<!-- ##################################################### -->
+
+  <fileserve>1</fileserve>
+
+  <paths>
+    <basedir>/usr/share/icecast</basedir>
+    <logdir>/var/log/icecast-kh</logdir>
+    <webroot>/usr/share/icecast/web</webroot>
+    <adminroot>/usr/share/icecast/admin</adminroot>
+    <alias source="/" dest="/index.html"/>
+    <x-forwarded-for>${IP_ADDRESS_GATEWAY}</x-forwarded-for>
+  </paths>
+
+  <logging>
+    <accesslog>access.log</accesslog>
+    <errorlog>error.log</errorlog>
+    <playlistlog>playlist.log</playlistlog>
+    <loglevel>3</loglevel> <!-- 4 Debug, 3 Info, 2 Warn, 1 Error -->
+    <logsize>10000</logsize> <!-- Max size of a logfile -->
+    <logarchive>1</logarchive>
+  </logging>
+
+  <security>
+    <chroot>0</chroot>
+      <changeowner>
+        <user>icecast</user>
+        <group>icecast</group>
+      </changeowner>
+  </security>
+</icecast>
+
