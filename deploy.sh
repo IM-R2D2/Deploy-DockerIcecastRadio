@@ -101,6 +101,37 @@ ensure_docker() {
 ensure_docker
 echo ""
 
+# Optional: configure iptables rules for Docker bridge of this project
+ensure_iptables() {
+  if ! command -v iptables &>/dev/null; then
+    echo "iptables command not found; skipping firewall rule setup."
+    return 1
+  fi
+  # Basic check that iptables is usable
+  if ! sudo iptables -L INPUT -n &>/dev/null; then
+    echo "iptables is not available or cannot list rules; skipping firewall rule setup."
+    return 1
+  fi
+  return 0
+}
+
+add_project_iptables_rules() {
+  local bridge="br-${PROJECT_NAME}"
+
+  if ! ensure_iptables; then
+    return 0
+  fi
+
+  if ! ip link show "$bridge" &>/dev/null; then
+    echo "Bridge interface ${bridge} not found; skipping iptables rules."
+    return 0
+  fi
+
+  echo "Adding iptables rules for bridge ${bridge}..."
+  sudo iptables -I INPUT 3 -i "$bridge" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "Allow established and related connections from docker" -j ACCEPT
+  sudo iptables -I INPUT 4 -i "$bridge" -m conntrack --ctstate NEW -m comment --comment "Allow new connections from docker" -j ACCEPT
+}
+
 # Create directories: /usr/local/bin/docker always; if missing, create and assign ownership to user
 create_dirs() {
   if [[ ! -d "$BASE_DIR" ]]; then
@@ -214,6 +245,8 @@ echo ""
 echo "Starting stack: docker compose up -d in ${TARGET_DIR}..."
 if docker compose -f "${TARGET_DIR}/docker-compose.yml" --project-directory "$TARGET_DIR" up -d; then
   echo "Stack started."
+  # After the Docker network and bridge are created, add iptables rules if possible
+  add_project_iptables_rules
 else
   echo "Failed to start (e.g. permission denied). Run: newgrp docker   then: cd ${TARGET_DIR} && docker compose up -d"
 fi
