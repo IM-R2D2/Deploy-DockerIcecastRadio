@@ -100,7 +100,7 @@ All deploy and runtime settings are read from **`.env`** in the repo directory. 
 | Variable | Example | Description |
 |----------|---------|-------------|
 | `PROJECT_NAME` | `radio` | Project folder name under `/usr/local/bin/docker/` and under `/var/log/docker/`. |
-| `PORT_ICECAST_EXTERNAL` | `38000` | Host port mapped to Icecast (e.g. stream at `http://host:38000`). |
+| `PORT_ICECAST_EXTERNAL` | `8000` | Host port mapped to Icecast (e.g. stream at `http://host:8000`). |
 | `PORT_ICECAST` | `8000` | Port used **inside** the container (leave as is unless you change the image). |
 | `IP_ADDRESS` | `172.29.10.10` | Fixed IPv4 for the Icecast container. **Required.** |
 | `IP_ADDRESS_GATEWAY` | `172.29.10.1` | Gateway for the container network. **Required.** |
