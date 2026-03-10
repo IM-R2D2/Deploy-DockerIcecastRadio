@@ -163,6 +163,26 @@ deploy_icecast_conf() {
 
 deploy_icecast_conf
 
+# Copy nginx_example.conf to conf/${PROJECT_NAME_ICECAST}.conf with .env substitution
+deploy_nginx_conf() {
+  local name="${PROJECT_NAME_ICECAST:-$PROJECT_NAME}"
+  local src="$SCRIPT_DIR/conf/nginx_example.conf"
+  local dest="${TARGET_DIR}/conf/${name}.conf"
+  if [[ ! -f "$src" ]]; then
+    return 0
+  fi
+  [[ -f "$dest" ]] && sudo rm -f "$dest"
+  export DOMAIN_NAME PROJECT_NAME NAME_MAIN_MOUNT NAME_FALLBACK_MOUNT PORT_ICECAST_EXTERNAL
+  if command -v envsubst &>/dev/null; then
+    envsubst '$DOMAIN_NAME $PROJECT_NAME $NAME_MAIN_MOUNT $NAME_FALLBACK_MOUNT $PORT_ICECAST_EXTERNAL' < "$src" > "$dest"
+  else
+    cp "$src" "$dest"
+  fi
+  echo "[OK] Конфиг Nginx: conf/${name}.conf"
+}
+
+deploy_nginx_conf
+
 # Copy docker-compose.yml to deploy directory (substitution from .env)
 deploy_compose() {
   if [[ -z "${IP_ADDRESS}" ]] || [[ -z "${IP_ADDRESS_GATEWAY}" ]]; then
