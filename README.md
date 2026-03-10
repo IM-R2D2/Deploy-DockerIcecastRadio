@@ -60,7 +60,7 @@ You clone this repo on the server, fill in `.env`, run `./deploy.sh` — the sta
    - Install Docker if it is not present.
    - Create `/usr/local/bin/docker` (if missing) and `/usr/local/bin/docker/<PROJECT_NAME>/`.
    - Create log dirs under `/var/log/docker/<PROJECT_NAME>/` (e.g. `icecast`, `nginx`).
-   - Generate `conf/<PROJECT_NAME>.xml` (Icecast config) and `docker-compose.yml` in the project folder.
+   - Generate `conf/<PROJECT_NAME>.xml` (Icecast config), `conf/<PROJECT_NAME_ICECAST>.conf` (Nginx config from `conf/nginx_example.conf`), and `docker-compose.yml` in the project folder.
    - Start the stack (`docker compose up -d`), optionally add iptables rules for the project bridge, and run a quick service check (curl). At the end it prints a short summary (project path, service status, logs command).
 
 4. **If the stack started successfully**, you're done. To view logs:
@@ -89,8 +89,17 @@ You clone this repo on the server, fill in `.env`, run `./deploy.sh` — the sta
 | `/usr/local/bin/docker/` | Base directory for all projects. Created once; owned by the user who first ran deploy. |
 | `/usr/local/bin/docker/<PROJECT_NAME>/` | One folder per project (e.g. `radio`). Contains `conf/`, `docker-compose.yml`. |
 | `/usr/local/bin/docker/<PROJECT_NAME>/conf/<PROJECT_NAME>.xml` | Icecast config generated from `conf/icecast_example.xml` and `.env`. |
+| `/usr/local/bin/docker/<PROJECT_NAME>/conf/<PROJECT_NAME_ICECAST>.conf` | Nginx config generated from `conf/nginx_example.conf` and `.env` (for reverse proxy / HTTPS). |
 | `/var/log/docker/<PROJECT_NAME>/icecast/` | Icecast logs (owned by `1000:1000` for the container). |
-| `/var/log/docker/<PROJECT_NAME>/nginx/` | Reserved for future use (e.g. nginx). |
+| `/var/log/docker/<PROJECT_NAME>/nginx/` | Reserved for nginx logs when using the nginx config. |
+
+### Nginx and external access
+
+Note the example **`conf/nginx_example.conf`**: the deploy script generates from it a ready-to-use config named by project (**`conf/<PROJECT_NAME_ICECAST>.conf`**), which you can use to expose the stream via a reverse proxy (e.g. under a domain with HTTPS).
+
+**Do not forget to:**
+- **Generate SSL certificates** (e.g. with Certbot/Let’s Encrypt) for your domain.
+- **Open access through iptables** (or your firewall) for HTTP/HTTPS so that nginx can receive external traffic.
 
 ---
 
@@ -136,10 +145,11 @@ All deploy and runtime settings are read from **`.env`** in the repo directory. 
    - Creates `/var/log/docker/<PROJECT_NAME>/icecast` and `.../nginx`.
 4. **Ownership:** Project directory → current user; Icecast log directory → `1000:1000` (for the container).
 5. **Icecast config:** Copies `conf/icecast_example.xml` to `conf/<PROJECT_NAME>.xml`, substituting all variables from `.env` (via `envsubst` if available).
-6. **Compose:** Writes `docker-compose.yml` into the project directory with variables from `.env` replaced. Requires `IP_ADDRESS` and `IP_ADDRESS_GATEWAY` in `.env`; otherwise the script exits with an error.
-7. **Start stack:** Runs `docker compose up -d` in the project directory. On success, the containers are running.
-8. **Optional iptables:** If `iptables` is available and the bridge `br-<PROJECT_NAME>` exists, inserts rules to allow established/new connections from that bridge (so Docker traffic is not blocked by the host firewall).
-9. **Service check:** If `curl` is available, requests `http://127.0.0.1:<PORT_ICECAST_EXTERNAL>/` and prints the result in a one-line summary (e.g. `200 OK` or `недоступен`). The script then prints a final block: project path, service status, and the command to view logs.
+6. **Nginx config:** Copies `conf/nginx_example.conf` to `conf/<PROJECT_NAME_ICECAST>.conf`, substituting `DOMAIN_NAME`, `PROJECT_NAME`, `NAME_MAIN_MOUNT`, `NAME_FALLBACK_MOUNT`, `PORT_ICECAST_EXTERNAL` from `.env` (via `envsubst` if available). Use this file in your nginx setup to expose the stream over HTTPS.
+7. **Compose:** Writes `docker-compose.yml` into the project directory with variables from `.env` replaced. Requires `IP_ADDRESS` and `IP_ADDRESS_GATEWAY` in `.env`; otherwise the script exits with an error.
+8. **Start stack:** Runs `docker compose up -d` in the project directory. On success, the containers are running.
+9. **Optional iptables:** If `iptables` is available and the bridge `br-<PROJECT_NAME>` exists, inserts rules to allow established/new connections from that bridge (so Docker traffic is not blocked by the host firewall).
+10. **Service check:** If `curl` is available, requests `http://127.0.0.1:<PORT_ICECAST_EXTERNAL>/` and prints the result in a one-line summary (e.g. `200 OK` or `недоступен`). The script then prints a final block: project path, service status, and the command to view logs.
 
 Re-running `./deploy.sh` overwrites the generated config and compose file and restarts the stack (safe for updating settings).
 
@@ -197,7 +207,7 @@ Use a different `PROJECT_NAME` (and matching network/IP plan) per project:
 | `.env.example` | Sample environment file; copy to `.env` and edit. |
 | `conf/icecast_example.xml` | Icecast config template (variables substituted from `.env`). |
 | `conf/docker-compose.yml` | Compose template (variables substituted into the deployed `docker-compose.yml`). |
-| `conf/nginx_example.conf` | Placeholder for future nginx use. |
+| `conf/nginx_example.conf` | Nginx config template; deploy generates `conf/<PROJECT_NAME_ICECAST>.conf` from it for reverse proxy / HTTPS access. |
 
 `.env` is listed in `.gitignore` and is not committed; keep secrets and host-specific values there.
 
