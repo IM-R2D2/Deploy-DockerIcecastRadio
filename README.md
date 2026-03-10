@@ -9,9 +9,11 @@ One-command deploy for **Icecast** (streaming server) in Docker on a Linux host.
 - **Checks or installs Docker** on the host (Ubuntu: official Docker repo).
 - **Creates a fixed directory layout**: projects under `/usr/local/bin/docker/<project>`, logs under `/var/log/docker/<project>/`.
 - **Generates Icecast config** from a template, filled with your `.env` values.
-- **Deploys a ready-to-run `docker-compose.yml`** into the project folder so you can start the stack with `docker compose up -d`.
+- **Deploys a ready-to-run `docker-compose.yml`** into the project folder and **starts the stack** (`docker compose up -d`).
+- **Optional:** if `iptables` is available and the Docker bridge exists, adds firewall rules for traffic from the project bridge (`br-<PROJECT_NAME>`).
+- **Checks the service** with `curl` and prints a short summary (project path, service URL/status, logs command).
 
-You clone this repo on the server, fill in `.env`, run `./deploy.sh`, then start the container. No need to copy configs by hand.
+You clone this repo on the server, fill in `.env`, run `./deploy.sh` — the stack is deployed and started. No need to copy configs or run `docker compose up -d` by hand (unless the script reports a start failure, e.g. after a fresh Docker install).
 
 ---
 
@@ -21,6 +23,7 @@ You clone this repo on the server, fill in `.env`, run `./deploy.sh`, then start
 - **Bash** (script uses `bash`).
 - **sudo** for creating directories under `/usr/local/bin` and `/var/log`, and for installing Docker if missing.
 - **Optional:** `envsubst` (from `gettext-base`) for variable substitution in configs; if absent, templates are copied as-is (you’d have to edit them manually).
+- **Optional:** `curl` for the end-of-deploy service check; if absent, the summary shows that the check was skipped.
 
 ---
 
@@ -58,19 +61,19 @@ You clone this repo on the server, fill in `.env`, run `./deploy.sh`, then start
    - Create `/usr/local/bin/docker` (if missing) and `/usr/local/bin/docker/<PROJECT_NAME>/`.
    - Create log dirs under `/var/log/docker/<PROJECT_NAME>/` (e.g. `icecast`, `nginx`).
    - Generate `conf/<PROJECT_NAME>.xml` (Icecast config) and `docker-compose.yml` in the project folder.
+   - Start the stack (`docker compose up -d`), optionally add iptables rules for the project bridge, and run a quick service check (curl). At the end it prints a short summary (project path, service status, logs command).
 
-4. **Start Icecast**:
+4. **If the stack started successfully**, you're done. To view logs:
 
    ```bash
    cd /usr/local/bin/docker/<PROJECT_NAME>
-   docker compose up -d
+   docker compose logs -f
    ```
 
-   If Docker was **just installed** by the script, you may need to apply the new group first:
+   If the script reported a **start failure** (e.g. permission denied), Docker may have been just installed. Apply the new group and start manually:
 
    ```bash
    newgrp docker
-   # then again:
    cd /usr/local/bin/docker/<PROJECT_NAME>
    docker compose up -d
    ```
@@ -100,7 +103,7 @@ All deploy and runtime settings are read from **`.env`** in the repo directory. 
 | Variable | Example | Description |
 |----------|---------|-------------|
 | `PROJECT_NAME` | `radio` | Project folder name under `/usr/local/bin/docker/` and under `/var/log/docker/`. |
-| `PORT_ICECAST_EXTERNAL` | `8000` | Host port mapped to Icecast (e.g. stream at `http://host:8000`). |
+| `PORT_ICECAST_EXTERNAL` | `38000` | Host port mapped to Icecast (e.g. stream at `http://host:38000`). Default `38000`; if the port is in use, the script picks the next free one. |
 | `PORT_ICECAST` | `8000` | Port used **inside** the container (leave as is unless you change the image). |
 | `IP_ADDRESS` | `172.29.10.10` | Fixed IPv4 for the Icecast container. **Required.** |
 | `IP_ADDRESS_GATEWAY` | `172.29.10.1` | Gateway for the container network. **Required.** |
@@ -134,14 +137,18 @@ All deploy and runtime settings are read from **`.env`** in the repo directory. 
 4. **Ownership:** Project directory → current user; Icecast log directory → `1000:1000` (for the container).
 5. **Icecast config:** Copies `conf/icecast_example.xml` to `conf/<PROJECT_NAME>.xml`, substituting all variables from `.env` (via `envsubst` if available).
 6. **Compose:** Writes `docker-compose.yml` into the project directory with variables from `.env` replaced. Requires `IP_ADDRESS` and `IP_ADDRESS_GATEWAY` in `.env`; otherwise the script exits with an error.
+7. **Start stack:** Runs `docker compose up -d` in the project directory. On success, the containers are running.
+8. **Optional iptables:** If `iptables` is available and the bridge `br-<PROJECT_NAME>` exists, inserts rules to allow established/new connections from that bridge (so Docker traffic is not blocked by the host firewall).
+9. **Service check:** If `curl` is available, requests `http://127.0.0.1:<PORT_ICECAST_EXTERNAL>/` and prints the result in a one-line summary (e.g. `200 OK` or `недоступен`). The script then prints a final block: project path, service status, and the command to view logs.
 
-Re-running `./deploy.sh` overwrites the generated config and compose file (safe for updating settings).
+Re-running `./deploy.sh` overwrites the generated config and compose file and restarts the stack (safe for updating settings).
 
 ---
 
 ## Running and managing the stack
 
 - **Start:**  
+  The deploy script starts the stack automatically. To start manually (e.g. after `docker compose down`):  
   `cd /usr/local/bin/docker/<PROJECT_NAME>` then `docker compose up -d`
 - **Stop:**  
   `docker compose down`
@@ -161,8 +168,7 @@ Use a different `PROJECT_NAME` (and matching network/IP plan) per project:
 
 1. Copy or edit `.env` with a new `PROJECT_NAME` and a different `IP_ADDRESS` (and optionally `SUBNET` / gateway).
 2. Run `./deploy.sh` again from the same repo directory.
-3. A new folder `/usr/local/bin/docker/<new_project>/` and new log dirs under `/var/log/docker/<new_project>/` will be created.
-4. Start it with `cd /usr/local/bin/docker/<new_project> && docker compose up -d`.
+3. A new folder `/usr/local/bin/docker/<new_project>/` and new log dirs under `/var/log/docker/<new_project>/` will be created, and the script will start the new stack. If the script did not start it (e.g. permission issue), run `cd /usr/local/bin/docker/<new_project> && docker compose up -d`.
 
 ---
 
@@ -186,7 +192,7 @@ Use a different `PROJECT_NAME` (and matching network/IP plan) per project:
 
 | Item | Description |
 |------|-------------|
-| `deploy.sh` | Main deploy script: Docker check/install, directories, permissions, Icecast config, compose. |
+| `deploy.sh` | Main deploy script: Docker check/install, directories, permissions, Icecast config, compose, stack start, optional iptables rules for the project bridge, and a curl-based service check with a short summary. |
 | `install-docker.sh` | Standalone Docker install for Ubuntu (used by `deploy.sh` when Docker is missing). |
 | `.env.example` | Sample environment file; copy to `.env` and edit. |
 | `conf/icecast_example.xml` | Icecast config template (variables substituted from `.env`). |

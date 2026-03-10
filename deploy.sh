@@ -71,27 +71,23 @@ if ! is_port_free "$PORT_ICECAST_EXTERNAL"; then
     exit 1
   fi
   PORT_ICECAST_EXTERNAL="$found"
-  echo "Port from .env is in use; using first available: ${PORT_ICECAST_EXTERNAL}"
-  echo ""
 fi
 
-echo "=== Deploying project: ${PROJECT_NAME} ==="
-echo "Project dir:   ${TARGET_DIR}"
-echo "Log dir:       ${LOG_PROJECT_DIR} (icecast, nginx)"
-echo "External port: ${PORT_ICECAST_EXTERNAL} (host → Icecast)"
-echo "Owner:         ${CURRENT_USER}:${CURRENT_GROUP}"
+# --- Compact status output ---
+echo "--- Deploy: ${PROJECT_NAME} (port ${PORT_ICECAST_EXTERNAL}, ${CURRENT_USER}) ---"
 echo ""
 
 # Check for Docker; install if missing
 ensure_docker() {
   if command -v docker &>/dev/null; then
-    echo "Docker is installed. Checking service..."
     sudo systemctl start docker 2>/dev/null || true
+    echo "[OK] Docker запущен"
     return 0
   fi
-  echo "Docker not found. Running installer..."
+  echo "Docker не найден, запуск установки..."
   if [[ -x "$SCRIPT_DIR/install-docker.sh" ]]; then
-    sudo "$SCRIPT_DIR/install-docker.sh"
+    sudo "$SCRIPT_DIR/install-docker.sh" 2>&1 | tail -5
+    echo "[OK] Docker установлен"
   else
     echo "Error: install-docker.sh not found or not executable (chmod +x install-docker.sh)."
     exit 1
@@ -103,15 +99,8 @@ echo ""
 
 # Optional: configure iptables rules for Docker bridge of this project
 ensure_iptables() {
-  if ! command -v iptables &>/dev/null; then
-    echo "iptables command not found; skipping firewall rule setup."
-    return 1
-  fi
-  # Basic check that iptables is usable
-  if ! sudo iptables -L INPUT -n &>/dev/null; then
-    echo "iptables is not available or cannot list rules; skipping firewall rule setup."
-    return 1
-  fi
+  command -v iptables &>/dev/null || return 1
+  sudo iptables -L INPUT -n &>/dev/null || return 1
   return 0
 }
 
@@ -123,55 +112,28 @@ add_project_iptables_rules() {
   fi
 
   if ! ip link show "$bridge" &>/dev/null; then
-    echo "Bridge interface ${bridge} not found; skipping iptables rules."
     return 0
   fi
 
-  echo "Adding iptables rules for bridge ${bridge}..."
-  sudo iptables -I INPUT 3 -i "$bridge" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "Allow established and related connections from docker" -j ACCEPT
-  sudo iptables -I INPUT 4 -i "$bridge" -m conntrack --ctstate NEW -m comment --comment "Allow new connections from docker" -j ACCEPT
+  sudo iptables -I INPUT 3 -i "$bridge" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "Allow established and related connections from docker" -j ACCEPT 2>/dev/null || true
+  sudo iptables -I INPUT 4 -i "$bridge" -m conntrack --ctstate NEW -m comment --comment "Allow new connections from docker" -j ACCEPT 2>/dev/null || true
+  echo "[OK] Правила iptables для br-${PROJECT_NAME}"
 }
 
 # Create directories: /usr/local/bin/docker always; if missing, create and assign ownership to user
 create_dirs() {
   if [[ ! -d "$BASE_DIR" ]]; then
-    echo "Creating base directory: ${BASE_DIR}"
     sudo mkdir -p "$BASE_DIR"
     sudo chown "${CURRENT_USER}:${CURRENT_GROUP}" "$BASE_DIR"
-  else
-    echo "Base directory already exists: ${BASE_DIR}"
   fi
-
-  if [[ ! -d "$TARGET_DIR" ]]; then
-    echo "Creating project directory: ${TARGET_DIR}"
-    sudo mkdir -p "$TARGET_DIR"
-  else
-    echo "Project directory already exists: ${TARGET_DIR}"
-  fi
-
-  if [[ ! -d "$TARGET_DIR/conf" ]]; then
-    echo "Creating directory: ${TARGET_DIR}/conf"
-    sudo mkdir -p "${TARGET_DIR}/conf"
-  fi
-
-  if [[ ! -d "$TARGET_LOG_ICECAST" ]]; then
-    echo "Creating log directory: ${TARGET_LOG_ICECAST}"
-    sudo mkdir -p "$TARGET_LOG_ICECAST"
-  else
-    echo "Icecast log directory already exists: ${TARGET_LOG_ICECAST}"
-  fi
-  if [[ ! -d "$TARGET_LOG_NGINX" ]]; then
-    echo "Creating log directory: ${TARGET_LOG_NGINX}"
-    sudo mkdir -p "$TARGET_LOG_NGINX"
-  else
-    echo "Nginx log directory already exists: ${TARGET_LOG_NGINX}"
-  fi
+  sudo mkdir -p "$TARGET_DIR" "$TARGET_DIR/conf" "$TARGET_LOG_ICECAST" "$TARGET_LOG_NGINX" 2>/dev/null || true
+  echo "[OK] Каталоги: ${TARGET_DIR}, логи ${LOG_PROJECT_DIR}"
 }
 
 # Set ownership: icecast log dir to 1000:1000 (for container). Project dir chown is done once at the end.
 set_ownership() {
-  echo "Setting owner 1000:1000 for icecast logs..."
-  sudo chown -R 1000:1000 "${TARGET_LOG_ICECAST}"
+  sudo chown -R 1000:1000 "${TARGET_LOG_ICECAST}" 2>/dev/null || true
+  echo "[OK] Владелец логов icecast: 1000:1000"
 }
 
 create_dirs
@@ -182,12 +144,9 @@ deploy_icecast_conf() {
   local src="$SCRIPT_DIR/conf/icecast_example.xml"
   local dest="${TARGET_DIR}/conf/${PROJECT_NAME}.xml"
   if [[ ! -f "$src" ]]; then
-    echo "Skipping: template $src not found."
     return 0
   fi
-  # If dest exists as a directory (e.g. from a previous error), remove it so we can create the file
   [[ -d "$dest" ]] && sudo rm -rf "$dest"
-  # MAX_LISTENERS in template — use LIMITS_CLIENTS if not set
   export MAX_LISTENERS="${MAX_LISTENERS:-$LIMITS_CLIENTS}"
   export LIMITS_MAX_BANDWIDTH="${LIMITS_MAX_BANDWIDTH:-200M}"
   export PROJECT_NAME_ICECAST PROJECT_NAME_ICECAST_ADMIN LIMITS_CLIENTS LIMITS_SOURCES
@@ -197,10 +156,9 @@ deploy_icecast_conf() {
   if command -v envsubst &>/dev/null; then
     envsubst '$PROJECT_NAME_ICECAST $PROJECT_NAME_ICECAST_ADMIN $LIMITS_CLIENTS $LIMITS_SOURCES $LIMITS_MAX_BANDWIDTH $SOURCE_PASSWORD $RELAY_PASSWORD $ADMIN_LOGIN $ADMIN_PASSWORD $PORT_ICECAST $NAME_MAIN_MOUNT $MAX_LISTENERS $STREAM_NAME $STREAM_DESCRIPTION $STREAM_GENRE $STREAM_URL $NAME_FALLBACK_MOUNT $IP_ADDRESS_GATEWAY' < "$src" > "$dest"
   else
-    echo "envsubst not found; copying template without substitution."
     cp "$src" "$dest"
   fi
-  echo "Created config: ${dest} (mounted in compose as conf/${PROJECT_NAME}.xml)"
+  echo "[OK] Конфиг Icecast: conf/${PROJECT_NAME}.xml"
 }
 
 deploy_icecast_conf
@@ -215,10 +173,8 @@ deploy_compose() {
   local dest="${TARGET_DIR}/docker-compose.yml"
   [[ -d "$dest" ]] && sudo rm -rf "$dest"
   if [[ ! -f "$src" ]]; then
-    echo "Skipping: $src not found."
     return 0
   fi
-  # SUBNET default from IP_ADDRESS or fixed value
   if [[ -n "${SUBNET}" ]]; then
     export SUBNET
   elif [[ -n "${IP_ADDRESS}" ]]; then
@@ -232,23 +188,43 @@ deploy_compose() {
   else
     cp "$src" "$dest"
   fi
-  echo "Created: ${dest}"
+  echo "[OK] docker-compose.yml"
 }
 
 deploy_compose
 
-# Single place: chown -R project dir to current user (so no sudo needed for edits)
-echo "Setting owner ${CURRENT_USER}:${CURRENT_GROUP} for /usr/local/bin/docker/${PROJECT_NAME}..."
-sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$TARGET_DIR"
-
+sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$TARGET_DIR" 2>/dev/null || true
+echo "[OK] Владелец проекта: ${CURRENT_USER}"
 echo ""
-echo "Starting stack: docker compose up -d in ${TARGET_DIR}..."
-if docker compose -f "${TARGET_DIR}/docker-compose.yml" --project-directory "$TARGET_DIR" up -d; then
-  echo "Stack started."
-  # After the Docker network and bridge are created, add iptables rules if possible
+
+if docker compose -f "${TARGET_DIR}/docker-compose.yml" --project-directory "$TARGET_DIR" up -d &>/dev/null; then
+  echo "[OK] Стек запущен"
   add_project_iptables_rules
 else
-  echo "Failed to start (e.g. permission denied). Run: newgrp docker   then: cd ${TARGET_DIR} && docker compose up -d"
+  echo "[FAIL] Запуск стека не удался. Выполните: newgrp docker   затем: cd ${TARGET_DIR} && docker compose up -d"
 fi
+
+# One-line service check
+SERVICE_URL="http://127.0.0.1:${PORT_ICECAST_EXTERNAL}"
+if command -v curl &>/dev/null; then
+  sleep 3
+  code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$SERVICE_URL/" 2>/dev/null) || code=""
+  if [[ -n "$code" && "$code" =~ ^[0-9]+$ ]]; then
+    if [[ "$code" == "200" ]]; then
+      CURL_RESULT="${SERVICE_URL} → 200 OK"
+    else
+      CURL_RESULT="${SERVICE_URL} → ${code}"
+    fi
+  else
+    CURL_RESULT="${SERVICE_URL} → недоступен"
+  fi
+else
+  CURL_RESULT="(curl не установлен)"
+fi
+
 echo ""
-echo "Done. Manage: cd ${TARGET_DIR} && docker compose logs -f"
+echo "--- Готово ---"
+echo "  Проект:  ${TARGET_DIR}"
+echo "  Сервис:  ${CURL_RESULT}"
+echo "  Логи:    cd ${TARGET_DIR} && docker compose logs -f"
+echo ""
