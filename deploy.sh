@@ -26,13 +26,11 @@ else
 fi
 
 PROJECT_NAME="${PROJECT_NAME:-radio}"
-# Base directory is always /usr/local/bin/docker; projects are subdirectories inside it
+# Base directory is always /usr/local/bin/docker; projects are subdirectories inside it; logs next to compose
 BASE_DIR="/usr/local/bin/docker"
-LOG_DIR="/var/log/docker"
 TARGET_DIR="${BASE_DIR}/${PROJECT_NAME}"
-LOG_PROJECT_DIR="${LOG_DIR}/${PROJECT_NAME}"
-TARGET_LOG_ICECAST="${LOG_PROJECT_DIR}/icecast"
-TARGET_LOG_NGINX="${LOG_PROJECT_DIR}/nginx"
+TARGET_LOG_ICECAST="${TARGET_DIR}/logs/icecast"
+TARGET_LOG_NGINX="${TARGET_DIR}/logs/nginx"
 # When run with sudo, owner is the user who invoked sudo
 CURRENT_USER="${SUDO_USER:-$USER}"
 CURRENT_GROUP="$CURRENT_USER"
@@ -127,7 +125,7 @@ create_dirs() {
     sudo chown "${CURRENT_USER}:${CURRENT_GROUP}" "$BASE_DIR"
   fi
   sudo mkdir -p "$TARGET_DIR" "$TARGET_DIR/conf" "$TARGET_LOG_ICECAST" "$TARGET_LOG_NGINX" 2>/dev/null || true
-  echo "[OK] Каталоги: ${TARGET_DIR}, логи ${LOG_PROJECT_DIR}"
+  echo "[OK] Каталоги: ${TARGET_DIR}, логи ${TARGET_DIR}/logs"
 }
 
 # Set ownership: icecast log dir to 1000:1000 (for container). Project dir chown is done once at the end.
@@ -162,6 +160,21 @@ deploy_icecast_conf() {
 }
 
 deploy_icecast_conf
+
+# Copy Icecast web files (status.xsl, status-json.xsl, xml2json.xslt) so JSON stats work without wget at deploy
+deploy_icecast_web() {
+  local src_dir="$SCRIPT_DIR/conf/icecast-web"
+  local dest_dir="${TARGET_DIR}/conf/icecast-web"
+  if [[ ! -d "$src_dir" ]]; then
+    return 0
+  fi
+  sudo mkdir -p "$dest_dir"
+  sudo cp -r "$src_dir"/* "$dest_dir/" 2>/dev/null || true
+  sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$dest_dir" 2>/dev/null || true
+  echo "[OK] Icecast web (status-json.xsl и др.): conf/icecast-web"
+}
+
+deploy_icecast_web
 
 # Copy nginx_example.conf to conf/${PROJECT_NAME_ICECAST}.conf with .env substitution
 deploy_nginx_conf() {

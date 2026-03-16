@@ -10,7 +10,8 @@ services:
         ipv4_address: ${IP_ADDRESS}
     volumes:
       - /usr/local/bin/docker/${PROJECT_NAME}/conf/${PROJECT_NAME}.xml:/etc/icecast-kh/icecast.xml:ro
-      - /var/log/docker/${PROJECT_NAME}/icecast:/var/log/icecast-kh
+      - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web:/usr/share/icecast/web:ro
+      - /usr/local/bin/docker/${PROJECT_NAME}/logs/icecast:/var/log/icecast-kh
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:${PORT_ICECAST}/status.xsl || exit 1"]
       interval: 30s
