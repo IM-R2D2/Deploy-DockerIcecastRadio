@@ -10,7 +10,7 @@ services:
         ipv4_address: ${IP_ADDRESS}
     volumes:
       - /usr/local/bin/docker/${PROJECT_NAME}/conf/${PROJECT_NAME}.xml:/etc/icecast-kh/icecast.xml:ro
-      # Только кастомные файлы — не затирать весь /usr/share/icecast/web (нужны includes/, style.css и т.д.)
+      # Mount only our overrides; do not replace the whole webroot (image needs includes/, style.css, etc.)
       - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web/status-json.xsl:/usr/share/icecast/web/status-json.xsl:ro
       - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web/xml2json.xslt:/usr/share/icecast/web/xml2json.xslt:ro
       - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web/index.html:/usr/share/icecast/web/index.html:ro

@@ -80,13 +80,13 @@ echo ""
 ensure_docker() {
   if command -v docker &>/dev/null; then
     sudo systemctl start docker 2>/dev/null || true
-    echo "[OK] Docker запущен"
+    echo "[OK] Docker is running"
     return 0
   fi
-  echo "Docker не найден, запуск установки..."
+  echo "Docker not found, starting install..."
   if [[ -x "$SCRIPT_DIR/install-docker.sh" ]]; then
     sudo "$SCRIPT_DIR/install-docker.sh" 2>&1 | tail -5
-    echo "[OK] Docker установлен"
+    echo "[OK] Docker installed"
   else
     echo "Error: install-docker.sh not found or not executable (chmod +x install-docker.sh)."
     exit 1
@@ -114,14 +114,14 @@ add_project_iptables_rules() {
     return 0
   fi
 
-  # -C (check): не дублировать правила при повторных деплоях
+  # iptables -C: avoid duplicate rules on repeated deploys
   if ! sudo iptables -C INPUT -i "$bridge" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "Allow established and related connections from docker" -j ACCEPT 2>/dev/null; then
     sudo iptables -I INPUT 3 -i "$bridge" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "Allow established and related connections from docker" -j ACCEPT 2>/dev/null || true
   fi
   if ! sudo iptables -C INPUT -i "$bridge" -m conntrack --ctstate NEW -m comment --comment "Allow new connections from docker" -j ACCEPT 2>/dev/null; then
     sudo iptables -I INPUT 4 -i "$bridge" -m conntrack --ctstate NEW -m comment --comment "Allow new connections from docker" -j ACCEPT 2>/dev/null || true
   fi
-  echo "[OK] Правила iptables для br-${PROJECT_NAME}"
+  echo "[OK] iptables rules for br-${PROJECT_NAME}"
 }
 
 # Create directories: /usr/local/bin/docker always; if missing, create and assign ownership to user
@@ -131,13 +131,13 @@ create_dirs() {
     sudo chown "${CURRENT_USER}:${CURRENT_GROUP}" "$BASE_DIR"
   fi
   sudo mkdir -p "$TARGET_DIR" "$TARGET_DIR/conf" "$TARGET_LOG_ICECAST" "$TARGET_LOG_NGINX" 2>/dev/null || true
-  echo "[OK] Каталоги: ${TARGET_DIR}, логи ${TARGET_DIR}/logs"
+  echo "[OK] Directories: ${TARGET_DIR}, logs ${TARGET_DIR}/logs"
 }
 
 # Set ownership: icecast log dir to 1000:1000 (for container). Project dir chown is done once at the end.
 set_ownership() {
   sudo chown -R 1000:1000 "${TARGET_LOG_ICECAST}" 2>/dev/null || true
-  echo "[OK] Владелец логов icecast: 1000:1000"
+  echo "[OK] Icecast log dir owner: 1000:1000"
 }
 
 create_dirs
@@ -162,23 +162,23 @@ deploy_icecast_conf() {
   else
     cp "$src" "$dest"
   fi
-  echo "[OK] Конфиг Icecast: conf/${PROJECT_NAME}.xml"
+  echo "[OK] Icecast config: conf/${PROJECT_NAME}.xml"
 }
 
 deploy_icecast_conf
 
-# Icecast web: только копирование из ./conf/icecast-web/ репозитория (файлы заранее в Git или подложены вручную).
+# Icecast web: copy from ./conf/icecast-web/ only (files vendored in git or added by hand).
 deploy_icecast_web() {
   local src_dir="$SCRIPT_DIR/conf/icecast-web"
   local dest_dir="${TARGET_DIR}/conf/icecast-web"
 
   if [[ ! -d "$src_dir" ]]; then
-    echo "[FAIL] Нет каталога $src_dir — запускайте ./deploy.sh из корня клона репозитория (рядом с conf/icecast-web/)."
+    echo "[FAIL] Missing directory $src_dir — run ./deploy.sh from the repo root (next to conf/icecast-web/)."
     exit 1
   fi
   for f in status-json.xsl xml2json.xslt index.html; do
     if [[ ! -f "$src_dir/$f" ]]; then
-      echo "[FAIL] Нет файла $src_dir/$f — положите его в репозиторий или обновите с Xiph (см. conf/icecast-web/README.md)."
+      echo "[FAIL] Missing file $src_dir/$f — add it to the repo or refresh from Xiph (see conf/icecast-web/README.md)."
       exit 1
     fi
   done
@@ -209,7 +209,7 @@ deploy_nginx_conf() {
   else
     cp "$src" "$dest"
   fi
-  echo "[OK] Конфиг Nginx: conf/${name}.conf"
+  echo "[OK] Nginx config: conf/${name}.conf"
 }
 
 deploy_nginx_conf
@@ -245,17 +245,17 @@ deploy_compose() {
 deploy_compose
 
 sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$TARGET_DIR" 2>/dev/null || true
-echo "[OK] Владелец проекта: ${CURRENT_USER}"
+echo "[OK] Project owner: ${CURRENT_USER}"
 echo ""
 
 compose_out="$(docker compose -f "${TARGET_DIR}/docker-compose.yml" --project-directory "$TARGET_DIR" up -d 2>&1)" || compose_rc=$?
 if [[ -z "${compose_rc:-}" ]]; then
-  echo "[OK] Стек запущен"
+  echo "[OK] Stack started"
   add_project_iptables_rules
 else
-  echo "[FAIL] Запуск стека не удался. Сообщение Docker:"
+  echo "[FAIL] Stack start failed. Docker output:"
   echo "$compose_out"
-  echo "Часто: нет прав на сокет — выполните: newgrp docker   или зайдите в систему заново; затем: cd ${TARGET_DIR} && docker compose up -d"
+  echo "Often: no permission on the Docker socket — run: newgrp docker   or log out and back in; then: cd ${TARGET_DIR} && docker compose up -d"
 fi
 unset compose_rc 2>/dev/null || true
 
@@ -271,15 +271,15 @@ if command -v curl &>/dev/null; then
       CURL_RESULT="${SERVICE_URL} → ${code}"
     fi
   else
-    CURL_RESULT="${SERVICE_URL} → недоступен"
+    CURL_RESULT="${SERVICE_URL} → unreachable"
   fi
 else
-  CURL_RESULT="(curl не установлен)"
+  CURL_RESULT="(curl not installed)"
 fi
 
 echo ""
-echo "--- Готово ---"
-echo "  Проект:  ${TARGET_DIR}"
-echo "  Сервис:  ${CURL_RESULT}"
-echo "  Логи:    cd ${TARGET_DIR} && docker compose logs -f"
+echo "--- Done ---"
+echo "  Project: ${TARGET_DIR}"
+echo "  Service: ${CURL_RESULT}"
+echo "  Logs:    cd ${TARGET_DIR} && docker compose logs -f"
 echo ""

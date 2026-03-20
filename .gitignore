@@ -1,4 +1,4 @@
-# Локальная конфигурация (секреты, хостовые настройки)
+# Local secrets and host-specific env
 .env
 .env.local
 .env.*.local
@@ -7,14 +7,14 @@
 .DS_Store
 Thumbs.db
 
-# Редакторы и IDE
+# Editors / IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# Временные и служебные
+# Temp / tooling
 *.log
 *.tmp
 .cache/
