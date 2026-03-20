@@ -113,8 +113,13 @@ add_project_iptables_rules() {
     return 0
   fi
 
-  sudo iptables -I INPUT 3 -i "$bridge" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "Allow established and related connections from docker" -j ACCEPT 2>/dev/null || true
-  sudo iptables -I INPUT 4 -i "$bridge" -m conntrack --ctstate NEW -m comment --comment "Allow new connections from docker" -j ACCEPT 2>/dev/null || true
+  # -C (check): не дублировать правила при повторных деплоях
+  if ! sudo iptables -C INPUT -i "$bridge" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "Allow established and related connections from docker" -j ACCEPT 2>/dev/null; then
+    sudo iptables -I INPUT 3 -i "$bridge" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "Allow established and related connections from docker" -j ACCEPT 2>/dev/null || true
+  fi
+  if ! sudo iptables -C INPUT -i "$bridge" -m conntrack --ctstate NEW -m comment --comment "Allow new connections from docker" -j ACCEPT 2>/dev/null; then
+    sudo iptables -I INPUT 4 -i "$bridge" -m conntrack --ctstate NEW -m comment --comment "Allow new connections from docker" -j ACCEPT 2>/dev/null || true
+  fi
   echo "[OK] Правила iptables для br-${PROJECT_NAME}"
 }
 

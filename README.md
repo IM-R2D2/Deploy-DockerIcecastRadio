@@ -10,7 +10,7 @@ One-command deploy for **Icecast** (streaming server) in Docker on a Linux host.
 - **Creates a fixed directory layout**: projects under `/usr/local/bin/docker/<project>`, logs in the same project folder (`.../logs/icecast`, `.../logs/nginx`).
 - **Generates Icecast config** from a template, filled with your `.env` values.
 - **Deploys a ready-to-run `docker-compose.yml`** into the project folder and **starts the stack** (`docker compose up -d`).
-- **Optional:** if `iptables` is available and the Docker bridge exists, adds firewall rules for traffic from the project bridge (`br-<PROJECT_NAME>`).
+- **Optional:** if `iptables` is available and the Docker bridge exists, ensures firewall rules for traffic from the project bridge (`br-<PROJECT_NAME>`); repeated deploys do not duplicate the same rules (`iptables -C` before insert).
 - **Checks the service** with `curl` and prints a short summary (project path, service URL/status, logs command).
 
 You clone this repo on the server, fill in `.env`, run `./deploy.sh` — the stack is deployed and started. No need to copy configs or run `docker compose up -d` by hand (unless the script reports a start failure, e.g. after a fresh Docker install).
@@ -149,7 +149,7 @@ All deploy and runtime settings are read from **`.env`** in the repo directory. 
 7. **Nginx config:** Copies `conf/nginx_example.conf` to `conf/<PROJECT_NAME_ICECAST>.conf`, substituting `DOMAIN_NAME`, `PROJECT_NAME`, `NAME_MAIN_MOUNT`, `NAME_FALLBACK_MOUNT`, `PORT_ICECAST_EXTERNAL` from `.env` (via `envsubst` if available). Use this file in your nginx setup to expose the stream over HTTPS.
 8. **Compose:** Writes `docker-compose.yml` into the project directory with variables from `.env` replaced. Requires `IP_ADDRESS` and `IP_ADDRESS_GATEWAY` in `.env`; otherwise the script exits with an error.
 9. **Start stack:** Runs `docker compose up -d` in the project directory. On success, the containers are running.
-10. **Optional iptables:** If `iptables` is available and the bridge `br-<PROJECT_NAME>` exists, inserts rules to allow established/new connections from that bridge (so Docker traffic is not blocked by the host firewall).
+10. **Optional iptables:** If `iptables` is available and the bridge `br-<PROJECT_NAME>` exists, inserts rules to allow established/new connections from that bridge only when an identical rule is not already present (so Docker traffic is not blocked and redeploy does not stack duplicates).
 11. **Service check:** If `curl` is available, requests `http://127.0.0.1:<PORT_ICECAST_EXTERNAL>/` and prints the result in a one-line summary (e.g. `200 OK` or `недоступен`). The script then prints a final block: project path, service status, and the command to view logs.
 
 Re-running `./deploy.sh` overwrites the generated config and compose file and restarts the stack (safe for updating settings).
