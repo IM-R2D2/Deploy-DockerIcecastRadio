@@ -166,17 +166,22 @@ deploy_icecast_conf() {
 
 deploy_icecast_conf
 
-# Copy Icecast web files (status.xsl, status-json.xsl, xml2json.xslt) so JSON stats work without wget at deploy
+# Copy Icecast web overrides (status-json.xsl, xml2json.xslt, index.html) — в compose монтируются по файлам, не весь webroot
 deploy_icecast_web() {
   local src_dir="$SCRIPT_DIR/conf/icecast-web"
   local dest_dir="${TARGET_DIR}/conf/icecast-web"
   if [[ ! -d "$src_dir" ]]; then
     return 0
   fi
+  sudo rm -rf "$dest_dir"
   sudo mkdir -p "$dest_dir"
-  sudo cp -r "$src_dir"/* "$dest_dir/" 2>/dev/null || true
+  for f in status-json.xsl xml2json.xslt index.html; do
+    if [[ -f "$src_dir/$f" ]]; then
+      sudo cp "$src_dir/$f" "$dest_dir/$f"
+    fi
+  done
   sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$dest_dir" 2>/dev/null || true
-  echo "[OK] Icecast web (status-json.xsl и др.): conf/icecast-web"
+  echo "[OK] Icecast web overrides: conf/icecast-web (status-json.xsl, xml2json.xslt, index.html)"
 }
 
 deploy_icecast_web

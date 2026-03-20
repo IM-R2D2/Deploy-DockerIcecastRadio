@@ -101,6 +101,19 @@ Note the example **`conf/nginx_example.conf`**: the deploy script generates from
 - **Generate SSL certificates** (e.g. with Certbot/Let’s Encrypt) for your domain.
 - **Open access through iptables** (or your firewall) for HTTP/HTTPS so that nginx can receive external traffic.
 
+### Statistics: `status-json.xsl`, `xml2json.xslt`, and “only under `/admin/…`”
+
+The files **`status-json.xsl`** and **`xml2json.xslt`** in `conf/icecast-web/` match the current **[xiph/Icecast-Server `web/`](https://github.com/xiph/Icecast-Server/tree/master)** sources (same as the `wget` commands into `/usr/local/share/icecast/web/` on a native install). In the container they are mounted over `/usr/share/icecast/web/`. They **only change how** Icecast turns internal stats XML into **JSON** and **which fields are omitted** (the extra `xsl:template` rules live in upstream `status-json.xsl`). They **do not** move the endpoint into the admin URL space and **do not** add authentication.
+
+By default, anyone who can reach Icecast can still call **`/status-json.xsl`** (and other public stats URLs) unless you block them at **nginx** (or firewall). Icecast **2.5+** suggests migrating to **`/admin/publicstats`** (and optionally `/admin/eventfeed`) instead of relying on `/status-json.xsl` long term — that is a **built-in admin** JSON API, not the same thing as a custom nginx path like `/admin/stats`.
+
+To serve filtered JSON **only** on a path such as **`/admin/stats`**, configure nginx yourself, for example:
+
+1. **`location = /admin/stats`** — `proxy_pass` to `http://127.0.0.1:<PORT_ICECAST_EXTERNAL>/status-json.xsl`, plus **`auth_basic`** (or another gate) if you want login.
+2. **`location = /status-json.xsl`** (and optionally **`/status.xsl`**) — **`return 404`** (or `403`) on the public `server` so clients cannot bypass your `/admin/stats` URL.
+
+Place these `location`s so they take effect **before** the broad `location /` that proxies to Icecast in `nginx_example.conf`.
+
 ---
 
 ## Configuration
@@ -145,7 +158,7 @@ All deploy and runtime settings are read from **`.env`** in the repo directory. 
    - Creates `/usr/local/bin/docker/<PROJECT_NAME>/logs/icecast` and `.../logs/nginx`.
 4. **Ownership:** Project directory → current user; Icecast log directory → `1000:1000` (for the container).
 5. **Icecast config:** Copies `conf/icecast_example.xml` to `conf/<PROJECT_NAME>.xml`, substituting all variables from `.env` (via `envsubst` if available).
-6. **Icecast web:** Copies `conf/icecast-web/` (в т.ч. `status-json.xsl`, `xml2json.xslt`) в целевую `conf/icecast-web/` и монтирует её в контейнер как webroot — JSON-статистика доступна без скачивания при каждом деплое.
+6. **Icecast web:** Копирует в `conf/icecast-web/` только переопределения: `status-json.xsl`, `xml2json.xslt`, `index.html`. В `docker-compose` они монтируются **по одному файлу** поверх стандартного `/usr/share/icecast/web` образа (целиком webroot не подменяется — сохраняются `includes/`, `style.css` и штатный `status.xsl`). Базовые `status-json.xsl` и `xml2json.xslt` взяты из официального [Icecast-Server (Xiph)](https://github.com/xiph/Icecast-Server/tree/master/web) (те же файлы, что кладут на сервер так: `wget -O …/status-json.xsl https://raw.githubusercontent.com/xiph/Icecast-Server/master/web/status-json.xsl` и аналогично для `xml2json.xslt`); в репозитории они лежат уже с правками (например, скрытие полей в JSON), обновлять — диффом против upstream.
 7. **Nginx config:** Copies `conf/nginx_example.conf` to `conf/<PROJECT_NAME_ICECAST>.conf`, substituting `DOMAIN_NAME`, `PROJECT_NAME`, `NAME_MAIN_MOUNT`, `NAME_FALLBACK_MOUNT`, `PORT_ICECAST_EXTERNAL` from `.env` (via `envsubst` if available). Use this file in your nginx setup to expose the stream over HTTPS.
 8. **Compose:** Writes `docker-compose.yml` into the project directory with variables from `.env` replaced. Requires `IP_ADDRESS` and `IP_ADDRESS_GATEWAY` in `.env`; otherwise the script exits with an error.
 9. **Start stack:** Runs `docker compose up -d` in the project directory. On success, the containers are running.
@@ -207,7 +220,7 @@ Use a different `PROJECT_NAME` (and matching network/IP plan) per project:
 | `install-docker.sh` | Standalone Docker install for Ubuntu (used by `deploy.sh` when Docker is missing). |
 | `.env.example` | Sample environment file; copy to `.env` and edit. |
 | `conf/icecast_example.xml` | Icecast config template (variables substituted from `.env`). |
-| `conf/icecast-web/` | Web-файлы Icecast (в т.ч. `status-json.xsl`, `xml2json.xslt`) — копируются при деплое, без `wget`. Нужны для JSON-статистики (например, за прокси `/admin/stats`). |
+| `conf/icecast-web/` | Переопределения web: `status-json.xsl`, `xml2json.xslt`, `index.html`. Источник шаблонов JSON — [xiph/Icecast-Server `web/`](https://github.com/xiph/Icecast-Server/tree/master/web); при деплое копируются на хост и монтируются в контейнер по файлам (см. шаг 6 выше). |
 | `conf/docker-compose.yml` | Compose template (variables substituted into the deployed `docker-compose.yml`). |
 | `conf/nginx_example.conf` | Nginx config template; deploy generates `conf/<PROJECT_NAME_ICECAST>.conf` from it for reverse proxy / HTTPS access. |
 

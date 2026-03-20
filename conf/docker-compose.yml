@@ -10,7 +10,10 @@ services:
         ipv4_address: ${IP_ADDRESS}
     volumes:
       - /usr/local/bin/docker/${PROJECT_NAME}/conf/${PROJECT_NAME}.xml:/etc/icecast-kh/icecast.xml:ro
-      - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web:/usr/share/icecast/web:ro
+      # Только кастомные файлы — не затирать весь /usr/share/icecast/web (нужны includes/, style.css и т.д.)
+      - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web/status-json.xsl:/usr/share/icecast/web/status-json.xsl:ro
+      - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web/xml2json.xslt:/usr/share/icecast/web/xml2json.xslt:ro
+      - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web/index.html:/usr/share/icecast/web/index.html:ro
       - /usr/local/bin/docker/${PROJECT_NAME}/logs/icecast:/var/log/icecast-kh
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:${PORT_ICECAST}/status.xsl || exit 1"]
