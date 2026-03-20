@@ -181,6 +181,12 @@ deploy_icecast_web() {
     fi
   done
   sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$dest_dir" 2>/dev/null || true
+  for f in status-json.xsl xml2json.xslt index.html; do
+    if [[ ! -f "$dest_dir/$f" ]]; then
+      echo "[FAIL] Нет файла для bind-mount: $dest_dir/$f (нужен из $src_dir/$f). Docker не поднимет контейнер."
+      exit 1
+    fi
+  done
   echo "[OK] Icecast web overrides: conf/icecast-web (status-json.xsl, xml2json.xslt, index.html)"
 }
 
@@ -240,12 +246,16 @@ sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$TARGET_DIR" 2>/dev/null || tr
 echo "[OK] Владелец проекта: ${CURRENT_USER}"
 echo ""
 
-if docker compose -f "${TARGET_DIR}/docker-compose.yml" --project-directory "$TARGET_DIR" up -d &>/dev/null; then
+compose_out="$(docker compose -f "${TARGET_DIR}/docker-compose.yml" --project-directory "$TARGET_DIR" up -d 2>&1)" || compose_rc=$?
+if [[ -z "${compose_rc:-}" ]]; then
   echo "[OK] Стек запущен"
   add_project_iptables_rules
 else
-  echo "[FAIL] Запуск стека не удался. Выполните: newgrp docker   затем: cd ${TARGET_DIR} && docker compose up -d"
+  echo "[FAIL] Запуск стека не удался. Сообщение Docker:"
+  echo "$compose_out"
+  echo "Часто: нет прав на сокет — выполните: newgrp docker   или зайдите в систему заново; затем: cd ${TARGET_DIR} && docker compose up -d"
 fi
+unset compose_rc 2>/dev/null || true
 
 # One-line service check
 SERVICE_URL="http://127.0.0.1:${PORT_ICECAST_EXTERNAL}"
