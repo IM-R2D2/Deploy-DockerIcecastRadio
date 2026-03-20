@@ -13,7 +13,7 @@ One-command deploy for **Icecast** (streaming server) in Docker on a Linux host.
 - **Optional:** if `iptables` is available and the Docker bridge exists, ensures firewall rules for traffic from the project bridge (`br-<PROJECT_NAME>`); repeated deploys do not duplicate the same rules (`iptables -C` before insert).
 - **Checks the service** with `curl` and prints a short summary (project path, service URL/status, logs command).
 
-You clone this repo on the server, fill in `.env`, run `./deploy.sh` — the stack is deployed and started. No need to copy configs or run `docker compose up -d` by hand (unless the script reports a start failure, e.g. after a fresh Docker install).
+You clone this repo on the server, fill in `.env`, run **`./deploy.sh` from the clone root** (so `conf/icecast-web/` with `status-json.xsl`, `xml2json.xslt`, `index.html` is next to the script — they are **committed in git**; to refresh from upstream use the commands in [`conf/icecast-web/README.md`](conf/icecast-web/README.md)). The stack is deployed and started; you only need `docker compose up -d` by hand if the script reports a start failure (e.g. after a fresh Docker install).
 
 ---
 
@@ -158,7 +158,7 @@ All deploy and runtime settings are read from **`.env`** in the repo directory. 
    - Creates `/usr/local/bin/docker/<PROJECT_NAME>/logs/icecast` and `.../logs/nginx`.
 4. **Ownership:** Project directory → current user; Icecast log directory → `1000:1000` (for the container).
 5. **Icecast config:** Copies `conf/icecast_example.xml` to `conf/<PROJECT_NAME>.xml`, substituting all variables from `.env` (via `envsubst` if available).
-6. **Icecast web:** Копирует в `conf/icecast-web/` только переопределения: `status-json.xsl`, `xml2json.xslt`, `index.html`. В `docker-compose` они монтируются **по одному файлу** поверх стандартного `/usr/share/icecast/web` образа (целиком webroot не подменяется — сохраняются `includes/`, `style.css` и штатный `status.xsl`). Базовые `status-json.xsl` и `xml2json.xslt` взяты из официального [Icecast-Server (Xiph)](https://github.com/xiph/Icecast-Server/tree/master/web) (те же файлы, что кладут на сервер так: `wget -O …/status-json.xsl https://raw.githubusercontent.com/xiph/Icecast-Server/master/web/status-json.xsl` и аналогично для `xml2json.xslt`); в репозитории они лежат уже с правками (например, скрытие полей в JSON), обновлять — диффом против upstream.
+6. **Icecast web:** Копирует из **`./conf/icecast-web/`** репозитория в целевой проект три файла (`status-json.xsl`, `xml2json.xslt`, `index.html`). Они хранятся в Git заранее; обновление с [xiph/Icecast-Server `web/`](https://github.com/xiph/Icecast-Server/tree/master/web) — вручную (см. [`conf/icecast-web/README.md`](conf/icecast-web/README.md)). В `docker-compose` монтируются **по одному файлу** поверх `/usr/share/icecast/web` образа (не затирая `includes/`, `style.css`, штатный `status.xsl`).
 7. **Nginx config:** Copies `conf/nginx_example.conf` to `conf/<PROJECT_NAME_ICECAST>.conf`, substituting `DOMAIN_NAME`, `PROJECT_NAME`, `NAME_MAIN_MOUNT`, `NAME_FALLBACK_MOUNT`, `PORT_ICECAST_EXTERNAL` from `.env` (via `envsubst` if available). Use this file in your nginx setup to expose the stream over HTTPS.
 8. **Compose:** Writes `docker-compose.yml` into the project directory with variables from `.env` replaced. Requires `IP_ADDRESS` and `IP_ADDRESS_GATEWAY` in `.env`; otherwise the script exits with an error.
 9. **Start stack:** Runs `docker compose up -d` in the project directory. On success, the containers are running.
@@ -220,7 +220,7 @@ Use a different `PROJECT_NAME` (and matching network/IP plan) per project:
 | `install-docker.sh` | Standalone Docker install for Ubuntu (used by `deploy.sh` when Docker is missing). |
 | `.env.example` | Sample environment file; copy to `.env` and edit. |
 | `conf/icecast_example.xml` | Icecast config template (variables substituted from `.env`). |
-| `conf/icecast-web/` | Переопределения web: `status-json.xsl`, `xml2json.xslt`, `index.html`. Источник шаблонов JSON — [xiph/Icecast-Server `web/`](https://github.com/xiph/Icecast-Server/tree/master/web); при деплое копируются на хост и монтируются в контейнер по файлам (см. шаг 6 выше). |
+| `conf/icecast-web/` | Переопределения web + [`README.md`](conf/icecast-web/README.md) (как обновить с Xiph). При деплое копируется на хост и монтируется по файлам (шаг 6). |
 | `conf/docker-compose.yml` | Compose template (variables substituted into the deployed `docker-compose.yml`). |
 | `conf/nginx_example.conf` | Nginx config template; deploy generates `conf/<PROJECT_NAME_ICECAST>.conf` from it for reverse proxy / HTTPS access. |
 

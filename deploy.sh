@@ -4,8 +4,9 @@
 # Typical workflow:
 #   1. On host: git clone <repo> /docker  (or any directory)
 #   2. Fill in .env
-#   3. ./deploy.sh  — deploy to /usr/local/bin/docker/${PROJECT_NAME}
-#   4. cd /usr/local/bin/docker/${PROJECT_NAME} && docker compose up -d
+#   3. From the clone: ./deploy.sh  — copies to /usr/local/bin/docker/${PROJECT_NAME}
+#      (requires ./conf/icecast-web/*.xsl next to this script — vendored in git, see conf/icecast-web/README.md)
+#   4. cd /usr/local/bin/docker/${PROJECT_NAME} && docker compose up -d  (only if deploy did not start the stack)
 #
 # Run: ./deploy.sh  or  bash deploy.sh
 
@@ -166,27 +167,28 @@ deploy_icecast_conf() {
 
 deploy_icecast_conf
 
-# Copy Icecast web overrides (status-json.xsl, xml2json.xslt, index.html) — в compose монтируются по файлам, не весь webroot
+# Icecast web: только копирование из ./conf/icecast-web/ репозитория (файлы заранее в Git или подложены вручную).
 deploy_icecast_web() {
   local src_dir="$SCRIPT_DIR/conf/icecast-web"
   local dest_dir="${TARGET_DIR}/conf/icecast-web"
+
   if [[ ! -d "$src_dir" ]]; then
-    return 0
+    echo "[FAIL] Нет каталога $src_dir — запускайте ./deploy.sh из корня клона репозитория (рядом с conf/icecast-web/)."
+    exit 1
   fi
-  sudo rm -rf "$dest_dir"
-  sudo mkdir -p "$dest_dir"
   for f in status-json.xsl xml2json.xslt index.html; do
-    if [[ -f "$src_dir/$f" ]]; then
-      sudo cp "$src_dir/$f" "$dest_dir/$f"
-    fi
-  done
-  sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$dest_dir" 2>/dev/null || true
-  for f in status-json.xsl xml2json.xslt index.html; do
-    if [[ ! -f "$dest_dir/$f" ]]; then
-      echo "[FAIL] Нет файла для bind-mount: $dest_dir/$f (нужен из $src_dir/$f). Docker не поднимет контейнер."
+    if [[ ! -f "$src_dir/$f" ]]; then
+      echo "[FAIL] Нет файла $src_dir/$f — положите его в репозиторий или обновите с Xiph (см. conf/icecast-web/README.md)."
       exit 1
     fi
   done
+
+  sudo rm -rf "$dest_dir"
+  sudo mkdir -p "$dest_dir"
+  for f in status-json.xsl xml2json.xslt index.html; do
+    sudo cp "$src_dir/$f" "$dest_dir/$f"
+  done
+  sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$dest_dir" 2>/dev/null || true
   echo "[OK] Icecast web overrides: conf/icecast-web (status-json.xsl, xml2json.xslt, index.html)"
 }
 
