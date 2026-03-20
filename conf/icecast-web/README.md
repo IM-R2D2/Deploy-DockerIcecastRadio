@@ -2,7 +2,9 @@
 
 These files are copied to `/usr/local/bin/docker/<PROJECT>/conf/icecast-web/` and mounted into the container over the stock `/usr/share/icecast/web` (only these three paths).
 
-Required in the repo:
+**`deploy.sh`** creates `conf/icecast-web/` if needed and **downloads any missing** of the three files from Xiph (`curl` or `wget`). You can still vendor them in git or update by hand below.
+
+Expected in the repo (or fetched on deploy):
 
 - `status-json.xsl`
 - `xml2json.xslt`

@@ -5,7 +5,7 @@
 #   1. On host: git clone <repo> /docker  (or any directory)
 #   2. Fill in .env
 #   3. From the clone: ./deploy.sh  — copies to /usr/local/bin/docker/${PROJECT_NAME}
-#      (requires ./conf/icecast-web/*.xsl next to this script — vendored in git, see conf/icecast-web/README.md)
+#      (conf/icecast-web/: vendored in git or auto-downloaded from xiph/Icecast-Server when missing)
 #   4. cd /usr/local/bin/docker/${PROJECT_NAME} && docker compose up -d  (only if deploy did not start the stack)
 #
 # Run: ./deploy.sh  or  bash deploy.sh
@@ -167,21 +167,53 @@ deploy_icecast_conf() {
 
 deploy_icecast_conf
 
-# Icecast web: copy from ./conf/icecast-web/ only (files vendored in git or added by hand).
+# Fetch a single file from Xiph Icecast-Server web/ into dest (writes via sudo).
+icecast_web_download_xiph() {
+  local url="$1" dest="$2"
+  local tmp
+  tmp="$(mktemp)" || return 1
+  if command -v curl &>/dev/null && curl -fsSL "$url" -o "$tmp" 2>/dev/null; then
+    sudo cp "$tmp" "$dest"
+    rm -f "$tmp"
+    return 0
+  fi
+  if command -v wget &>/dev/null && wget -qO "$tmp" "$url" 2>/dev/null; then
+    sudo cp "$tmp" "$dest"
+    rm -f "$tmp"
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+# Icecast web: prefer ./conf/icecast-web/ from the repo; missing files are downloaded from xiph/Icecast-Server.
 deploy_icecast_web() {
   local src_dir="$SCRIPT_DIR/conf/icecast-web"
   local dest_dir="${TARGET_DIR}/conf/icecast-web"
+  local script_root target_root
+  local xiph="https://raw.githubusercontent.com/xiph/Icecast-Server/master/web"
+  script_root="$(cd "$SCRIPT_DIR" && pwd -P)"
+  target_root="$(cd "$TARGET_DIR" && pwd -P)"
 
-  if [[ ! -d "$src_dir" ]]; then
-    echo "[FAIL] Missing directory $src_dir — run ./deploy.sh from the repo root (next to conf/icecast-web/)."
-    exit 1
-  fi
+  sudo mkdir -p "$src_dir"
+
   for f in status-json.xsl xml2json.xslt index.html; do
-    if [[ ! -f "$src_dir/$f" ]]; then
-      echo "[FAIL] Missing file $src_dir/$f — add it to the repo or refresh from Xiph (see conf/icecast-web/README.md)."
+    if [[ -f "$src_dir/$f" ]]; then
+      continue
+    fi
+    echo "[..] Downloading conf/icecast-web/$f from Xiph..."
+    if ! icecast_web_download_xiph "${xiph}/${f}" "$src_dir/$f"; then
+      echo "[FAIL] Could not download ${xiph}/${f} (need curl or wget and network). See conf/icecast-web/README.md."
       exit 1
     fi
   done
+
+  # Same tree as deploy target: never rm+cp icecast-web (would delete sources).
+  if [[ "$script_root" == "$target_root" ]]; then
+    sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$src_dir" 2>/dev/null || true
+    echo "[OK] Icecast web overrides: conf/icecast-web (status-json.xsl, xml2json.xslt, index.html)"
+    return 0
+  fi
 
   sudo rm -rf "$dest_dir"
   sudo mkdir -p "$dest_dir"
