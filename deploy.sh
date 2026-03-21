@@ -197,7 +197,7 @@ deploy_icecast_web() {
 
   sudo mkdir -p "$src_dir"
 
-  for f in status-json.xsl xml2json.xslt index.html; do
+  for f in status-json.xsl xml2json.xslt; do
     if [[ -f "$src_dir/$f" ]]; then
       continue
     fi
@@ -211,17 +211,17 @@ deploy_icecast_web() {
   # Same tree as deploy target: never rm+cp icecast-web (would delete sources).
   if [[ "$script_root" == "$target_root" ]]; then
     sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$src_dir" 2>/dev/null || true
-    echo "[OK] Icecast web overrides: conf/icecast-web (status-json.xsl, xml2json.xslt, index.html)"
+    echo "[OK] Icecast web overrides: conf/icecast-web (status-json.xsl, xml2json.xslt)"
     return 0
   fi
 
   sudo rm -rf "$dest_dir"
   sudo mkdir -p "$dest_dir"
-  for f in status-json.xsl xml2json.xslt index.html; do
+  for f in status-json.xsl xml2json.xslt; do
     sudo cp "$src_dir/$f" "$dest_dir/$f"
   done
   sudo chown -R "${CURRENT_USER}:${CURRENT_GROUP}" "$dest_dir" 2>/dev/null || true
-  echo "[OK] Icecast web overrides: conf/icecast-web (status-json.xsl, xml2json.xslt, index.html)"
+  echo "[OK] Icecast web overrides: conf/icecast-web (status-json.xsl, xml2json.xslt)"
 }
 
 deploy_icecast_web

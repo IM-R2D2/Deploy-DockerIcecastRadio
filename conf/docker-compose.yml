@@ -13,7 +13,7 @@ services:
       # Mount only our overrides; do not replace the whole webroot (image needs includes/, style.css, etc.)
       - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web/status-json.xsl:/usr/share/icecast/web/status-json.xsl:ro
       - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web/xml2json.xslt:/usr/share/icecast/web/xml2json.xslt:ro
-      - /usr/local/bin/docker/${PROJECT_NAME}/conf/icecast-web/index.html:/usr/share/icecast/web/index.html:ro
+      # Do not mount index.html — keep the image default (styled home page)
       - /usr/local/bin/docker/${PROJECT_NAME}/logs/icecast:/var/log/icecast-kh
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:${PORT_ICECAST}/status.xsl || exit 1"]

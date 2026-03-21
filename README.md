@@ -13,7 +13,7 @@ One-command deploy for **Icecast** (streaming server) in Docker on a Linux host.
 - **Optional:** if `iptables` is available and the Docker bridge exists, ensures firewall rules for traffic from the project bridge (`br-<PROJECT_NAME>`); repeated deploys do not duplicate the same rules (`iptables -C` before insert).
 - **Checks the service** with `curl` and prints a short summary (project path, service URL/status, logs command).
 
-You clone this repo on the server, fill in `.env`, run **`./deploy.sh` from the clone root**. For `conf/icecast-web/`, the script uses **`status-json.xsl`, `xml2json.xslt`, `index.html`** from the repo when present; **if any are missing**, it downloads them from [xiph/Icecast-Server `web/`](https://github.com/xiph/Icecast-Server/tree/master/web) with `curl` or `wget` (network required). To refresh pinned copies by hand, see [`conf/icecast-web/README.md`](conf/icecast-web/README.md). The stack is deployed and started; you only need `docker compose up -d` by hand if the script reports a start failure (e.g. after a fresh Docker install).
+You clone this repo on the server, fill in `.env`, run **`./deploy.sh` from the clone root**. For `conf/icecast-web/`, only **`status-json.xsl`** and **`xml2json.xslt`** are deployed and mounted (JSON stats overrides). Missing files are **downloaded from Xiph** with `curl` or `wget` when needed. The image’s **`index.html` and the rest of the web UI are not replaced** so the default Icecast pages keep working. See [`conf/icecast-web/README.md`](conf/icecast-web/README.md). The stack is deployed and started; you only need `docker compose up -d` by hand if the script reports a start failure (e.g. after a fresh Docker install).
 
 If the repo **is** the project folder under `/usr/local/bin/docker/<PROJECT_NAME>/` (same directory as `TARGET_DIR`), that layout is supported: the script will **not** delete `conf/icecast-web/` when syncing to itself.
 
@@ -160,7 +160,7 @@ All deploy and runtime settings are read from **`.env`** in the repo directory. 
    - Creates `/usr/local/bin/docker/<PROJECT_NAME>/logs/icecast` and `.../logs/nginx`.
 4. **Ownership:** Project directory → current user; Icecast log directory → `1000:1000` (for the container).
 5. **Icecast config:** Copies `conf/icecast_example.xml` to `conf/<PROJECT_NAME>.xml`, substituting all variables from `.env` (via `envsubst` if available).
-6. **Icecast web:** Ensures **`./conf/icecast-web/`** contains `status-json.xsl`, `xml2json.xslt`, `index.html` (from git or **downloaded from Xiph** if missing). Copies them into the deploy tree when the repo root differs from `TARGET_DIR`. `docker-compose` bind-mounts **each file** over the image’s `/usr/share/icecast/web` (so `includes/`, `style.css`, and stock `status.xsl` stay intact). Manual refresh: [`conf/icecast-web/README.md`](conf/icecast-web/README.md).
+6. **Icecast web:** Ensures **`./conf/icecast-web/`** has `status-json.xsl` and `xml2json.xslt` (git or **Xiph download** if missing). Copies into the deploy tree when the repo root differs from `TARGET_DIR`. `docker-compose` bind-mounts **only those two files**; **`index.html` is not mounted** so the stock Icecast home page and styles remain. Manual refresh: [`conf/icecast-web/README.md`](conf/icecast-web/README.md).
 7. **Nginx config:** Copies `conf/nginx_example.conf` to `conf/<PROJECT_NAME_ICECAST>.conf`, substituting `DOMAIN_NAME`, `PROJECT_NAME`, `NAME_MAIN_MOUNT`, `NAME_FALLBACK_MOUNT`, `PORT_ICECAST_EXTERNAL` from `.env` (via `envsubst` if available). Use this file in your nginx setup to expose the stream over HTTPS.
 8. **Compose:** Writes `docker-compose.yml` into the project directory with variables from `.env` replaced. Requires `IP_ADDRESS` and `IP_ADDRESS_GATEWAY` in `.env`; otherwise the script exits with an error.
 9. **Start stack:** Runs `docker compose up -d` in the project directory. On success, the containers are running.
@@ -222,7 +222,7 @@ Use a different `PROJECT_NAME` (and matching network/IP plan) per project:
 | `install-docker.sh` | Standalone Docker install for Ubuntu (used by `deploy.sh` when Docker is missing). |
 | `.env.example` | Sample environment file; copy to `.env` and edit. |
 | `conf/icecast_example.xml` | Icecast config template (variables substituted from `.env`). |
-| `conf/icecast-web/` | Web overrides + [`README.md`](conf/icecast-web/README.md). Deploy fills missing files from Xiph; otherwise copied to `TARGET_DIR` and bind-mounted per file (step 6). |
+| `conf/icecast-web/` | `status-json.xsl`, `xml2json.xslt` + [`README.md`](conf/icecast-web/README.md). Not mounting `index.html` (stock UI preserved). Step 6. |
 | `conf/docker-compose.yml` | Compose template (variables substituted into the deployed `docker-compose.yml`). |
 | `conf/nginx_example.conf` | Nginx config template; deploy generates `conf/<PROJECT_NAME_ICECAST>.conf` from it for reverse proxy / HTTPS access. |
 
